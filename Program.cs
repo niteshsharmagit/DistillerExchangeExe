@@ -21,8 +21,8 @@ namespace DistillerExchangeExe
             SqlConnection con = new SqlConnection("server=3.20.32.190; database=DistillerExchange; user=sa; password=lms123; Persist Security Info=False; Connect Timeout=25000; MultipleActiveResultSets=True;");
             con.Open();
 
-                //FilePath = @"E:\DotNet\DXLab\EXE";
-                FilePath = @"C:\Users\Nitesh Sharma\source\repos\DistillerExchangeExe";
+                FilePath = @"C:\DxLab - EXE\DistillerExchangeExe";
+                //FilePath = @"C:\Users\Nitesh Sharma\source\repos\DistillerExchangeExe";
 
             if (!File.Exists(FilePath + "\\" + "log.txt"))
                 File.Create(FilePath + "\\" + "log.txt");
