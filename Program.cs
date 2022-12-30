@@ -21,13 +21,19 @@ namespace DistillerExchangeExe
             SqlConnection con = new SqlConnection("server=3.20.32.190; database=DistillerExchange; user=sa; password=lms123; Persist Security Info=False; Connect Timeout=25000; MultipleActiveResultSets=True;");
             con.Open();
 
-                FilePath = @"C:\DxLab - EXE\DistillerExchangeExe";
+                 FilePath = @"C:\DotNet\DXLab\DistillateExchangeExe";
+                //FilePath = @"C:\DxLab - EXE\DistillerExchangeExe";
                 //FilePath = @"C:\Users\Nitesh Sharma\source\repos\DistillerExchangeExe";
+                //FilePath = @"D:\LMS\DistillerExchangeExe";
 
-            if (!File.Exists(FilePath + "\\" + "log.txt"))
+                if (!File.Exists(FilePath + "\\" + "log.txt"))
                 File.Create(FilePath + "\\" + "log.txt");
-            
-            SqlCommand cmd = new SqlCommand("select * from tblOilStockForSell Where Active = 1", con);
+
+
+                using (StreamWriter w = File.AppendText(FilePath + "\\" + "log.txt"))
+                      AppendLog("Data is updated or inserted for BidId " + 1, w);
+
+                    SqlCommand cmd = new SqlCommand("select * from tblOilStockForSell Where Active = 1", con);
 
             using (SqlDataReader oReader = cmd.ExecuteReader())
             {
@@ -40,6 +46,8 @@ namespace DistillerExchangeExe
                         DateTime CreatedDate = (DateTime)oReader["CreatedDate"];
                         int GoodForId = (int)oReader["GoodForId"];
                         int ForSellId = (int)oReader["ForSellId"];
+                        int UserId = (int)oReader["UserId"];
+                        string ProductTypeName =  obj.GetProductTypeName((int)oReader["ProductTypeId"], con)  ;
 
                         string BidDetailsQuery = "select * from tblBidDetails Where ForSellId = " + ForSellId;
                         SqlCommand BidDetailscmd = new SqlCommand(BidDetailsQuery, con);
@@ -55,6 +63,7 @@ namespace DistillerExchangeExe
                                 {
                                     // Active false of ForSell and Qty added to Wallet
                                     obj.UpdateForSellAndInsetWalletData(ForSellId, con, oReader);
+                                    obj.AddNotification(UserId, "Your product " + ProductTypeName + " has expired.", UserId, con);
                                 }
                             }
                         }
@@ -78,15 +87,20 @@ namespace DistillerExchangeExe
                                         {
                                             // Bid Cancel
                                             obj.UpdateBidDetailsData((int)BidDetailsReader["BidId"], con);
+                                            obj.AddNotification(UserId, "Your bid has been cancelled due to expiry of the product " + ProductTypeName , (int)BidDetailsReader["UserId"], con);
                                                 if (IsUpdateForSellAndInsetWalletDataExecute == false)
                                                 {
                                                     IsUpdateForSellAndInsetWalletDataExecute = true;
                                                     obj.UpdateForSellAndInsetWalletData(ForSellId, con, oReader);
+                                                    obj.AddNotification(UserId, "Your product " + ProductTypeName + " has expired.", UserId, con);
                                                 }                                            
                                         }
                                     }
                                 }
-                                 else if (SellReader.HasRows == true && (bool)BidDetailsReader["Active"] == false)
+
+                                    // If bid is selled then do nothing.
+
+                                    else if (SellReader.HasRows == true && (bool)BidDetailsReader["Active"] == false)
                                     {
                                         int GoodForHours = obj.GetGoodForHours(GoodForId, con);
                                         SqlDataReader DateDiffReader = obj.GetDateDifference(con, CreatedDate);
@@ -98,11 +112,14 @@ namespace DistillerExchangeExe
                                                 {
                                                     IsUpdateForSellAndInsetWalletDataExecute = true;
                                                     obj.UpdateForSellAndInsetWalletData(ForSellId, con, oReader);
+                                                    obj.AddNotification(UserId, "Your product " + ProductTypeName + " has expired.", UserId, con);
                                                 }
                                             }
                                         }
                                     }
                                 }
+
+
 
                                 //if (IsAnyBidSelled == false) //Active false of ForSell and Qty added to Wallet.
                                 //{
@@ -124,10 +141,31 @@ namespace DistillerExchangeExe
             }
             catch (Exception e)
             {
-                using (StreamWriter w = File.AppendText(FilePath + "\\" + "log.txt"))
-                    AppendLog(e.Message, w);
+                //using (StreamWriter w = File.AppendText(FilePath + "\\" + "log.txt"))
+                //    AppendLog(e.Message, w);
             }
 
+        }
+
+        public string GetProductTypeName(int ProductTypeId, SqlConnection con)
+        {
+            string GoodforText = String.Empty;
+            try
+            {
+                string ProductTypeQuery = "select * from tblProductMaster Where ProductID = " + ProductTypeId;
+                SqlCommand ProductTypecmd = new SqlCommand(ProductTypeQuery, con);
+                SqlDataReader ProductTypeQueryReader = ProductTypecmd.ExecuteReader();
+                while (ProductTypeQueryReader.Read())
+                {
+                   GoodforText = ProductTypeQueryReader["ProductName"].ToString();
+                }
+            }
+            catch (Exception e)
+            {
+                //using (StreamWriter w = File.AppendText(FilePath + "\\" + "log.txt"))
+                //    AppendLog(e.Message, w);
+            }
+            return GoodforText;
         }
 
         public int GetGoodForHours(int GoodForId, SqlConnection con)
@@ -146,8 +184,8 @@ namespace DistillerExchangeExe
             }
             catch (Exception e)
             {
-                using (StreamWriter w = File.AppendText(FilePath + "\\" + "log.txt"))
-                    AppendLog(e.Message, w);
+                //using (StreamWriter w = File.AppendText(FilePath + "\\" + "log.txt"))
+                //    AppendLog(e.Message, w);
             }
             return GoodForHours;
         }
@@ -162,8 +200,8 @@ namespace DistillerExchangeExe
             }
             catch (Exception e)
             {
-                using (StreamWriter w = File.AppendText(FilePath + "\\" + "log.txt"))
-                    AppendLog(e.Message, w);
+                //using (StreamWriter w = File.AppendText(FilePath + "\\" + "log.txt"))
+                //    AppendLog(e.Message, w);
             }
             return DateDiffReader;
         }
@@ -181,17 +219,17 @@ namespace DistillerExchangeExe
 
                 string OilWalletInsertQuery = "Insert into tblOilWallet (OilId,ProductTypeId,Quantity,UserId,SellerId,Active,CreatedDate,ModifiedDate,Decision,TrxType) VALUES ("
                         + (int)oReader["OilId"] + "," + (int)oReader["ProductTypeId"] + "," + RemainingQuantity + "," + (int)oReader["UserId"] + "," + (int)oReader["UserId"]
-                        + "," + 1 + "," + datetime + "," + datetime + "," + 1 + "," + 1 + ")";
+                        + "," + 1 + "," + datetime + "," + datetime + "," + 1 + "," + 3 + ")";
                 SqlCommand OilWalletInsertcmd = new SqlCommand(OilWalletInsertQuery, con);
                 OilWalletInsertcmd.ExecuteNonQuery();
 
-                using (StreamWriter w = File.AppendText(FilePath + "\\" + "log.txt"))
-                    AppendLog("Data is updated or inserted for ForSellId " + ForSellId, w);               
+                //using (StreamWriter w = File.AppendText(FilePath + "\\" + "log.txt"))
+                //    AppendLog("Data is updated or inserted for ForSellId " + ForSellId, w);               
             }
             catch (Exception e)
             {
-                using (StreamWriter w = File.AppendText(FilePath + "\\" + "log.txt"))
-                    AppendLog(e.Message + "ForSellId " + ForSellId, w);
+                //using (StreamWriter w = File.AppendText(FilePath + "\\" + "log.txt"))
+                //    AppendLog(e.Message + "ForSellId " + ForSellId, w);
             }
         }
         public void UpdateBidDetailsData(int BidId, SqlConnection con)
@@ -202,13 +240,35 @@ namespace DistillerExchangeExe
                 SqlCommand BidDetailsUpdatecmd = new SqlCommand(BidDetailsUpdateQuery, con);
                 BidDetailsUpdatecmd.ExecuteNonQuery();
 
-                using (StreamWriter w = File.AppendText(FilePath + "\\" + "log.txt"))
-                    AppendLog("Data is updated or inserted for BidId " + BidId, w);
+                //using (StreamWriter w = File.AppendText(FilePath + "\\" + "log.txt"))
+                //    AppendLog("Data is updated or inserted for BidId " + BidId, w);
+
             }
             catch (Exception e)
             {
-                using (StreamWriter w = File.AppendText(FilePath + "\\" + "log.txt"))
-                    AppendLog(e.Message + "BidId " + BidId, w);
+                //using (StreamWriter w = File.AppendText(FilePath + "\\" + "log.txt"))
+                //    AppendLog(e.Message + "BidId " + BidId, w);
+            }
+        }
+
+        public void AddNotification(int FromUserId, string Description, int ToUserId, SqlConnection con)
+        {
+            try
+            {
+                string datetime = string.Format("convert(datetime2, '{0:s}')", DateTime.Now);
+
+                string AddNotificationQuery = "Insert into tblNotification (Active,CreatedDate,ModifiedDate,FromUserId,IsSeen,ToUserId,NotificationDesc) VALUES ("
+                        + 1 + "," + datetime + "," + datetime + "," + FromUserId + "," + 0 + "," + ToUserId + "," + "'" + Description + "'" + ")";
+                SqlCommand AddNotificationInsertcmd = new SqlCommand(AddNotificationQuery, con);
+                AddNotificationInsertcmd.ExecuteNonQuery();
+
+                //using (StreamWriter w = File.AppendText(FilePath + "\\" + "log.txt"))
+                //    AppendLog("Data is inserted for ToUserId " + ToUserId + "and NotificationDesc = " + Description, w);
+            }
+
+            catch (Exception ex)
+            {
+                throw;
             }
         }
 
